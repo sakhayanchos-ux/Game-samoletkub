@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>САМОЛЕТКУБ</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22%D0%A1%D0%90%D0%9C%D0%9E%D0%9B%D0%95%D0%A2%D0%9A%D0%A3%D0%91%22%2C%22short_name%22%3A%22%D0%A1%D0%90%D0%9C%D0%9E%D0%9B%D0%95%D0%A2%D0%9A%D0%A3%D0%91%22%2C%22start_url%22%3A%22.%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%231a252f%22%2C%22theme_color%22%3A%22%231a252f%22%2C%22orientation%22%3A%22portrait%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg' viewBox%3D'0 0 512 512'%253E%253Crect fill%3D'%25231a252f' width%3D'512' height%3D'512' rx%3D'100'%2F%253E%253Ctext x%3D'256' y%3D'320' text-anchor%3D'middle' fill%3D'%2523f1c40f' font-size%3D'250' font-family%3D'Arial'%253E%E2%9C%88%253C%2Ftext%253E%253C%2Fsvg%253E%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%2C%22purpose%22%3A%22any%20maskable%22%7D%5D%7D">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="САМОЛЕТКУБ">
+    <meta name="theme-color" content="#1a252f">
+    
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: #1a252f;
+            font-family: 'Courier New', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            flex-direction: column;
+            color: #ecf0f1;
+            padding: 10px;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        h1 {
+            margin: 6px 0;
+            font-size: 26px;
+            letter-spacing: 4px;
+            text-shadow: 2px 2px 4px #000;
+            color: #f1c40f;
+        }
+        .scoreboard {
+            display: none;
+            background: #243342;
+            border: 2px solid #d4a017;
+            border-radius: 12px;
+            padding: 10px 24px;
+            margin-bottom: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #f1c40f;
+            letter-spacing: 1px;
+            text-align: center;
+        }
+        .names-container {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .names-container input {
+            padding: 10px 14px;
+            font-size: 15px;
+            border-radius: 8px;
+            border: 2px solid #5d6d7e;
+            background: #2c3e50;
+            color: #ecf0f1;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            width: 130px;
+            letter-spacing: 1px;
+        }
+        .names-container input::placeholder { color: #7f8c8d; letter-spacing: 0; }
+        .game-container {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: flex-start;
+        }
+        .player-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #243342;
+            padding: 12px;
+            border-radius: 12px;
+            border: 2px solid #4a6274;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+        .player-section h2 { margin-bottom: 8px; font-size: 17px; color: #f1c40f; letter-spacing: 1px; }
+        .field-container { display: flex; flex-direction: column; align-items: center; }
+        .col-labels-top, .col-labels-bottom {
+            display: flex; font-weight: bold; color: #d4a017; font-size: 14px; letter-spacing: 2px;
+        }
+        .col-labels-top div, .col-labels-bottom div {
+            width: 30px; height: 24px; display: flex; align-items: center; justify-content: center;
+        }
+        .field-row { display: flex; align-items: center; }
+        .row-label-left, .row-label-right {
+            display: flex; flex-direction: column; justify-content: space-around;
+            font-weight: bold; color: #d4a017; font-size: 14px;
+        }
+        .row-label-left div, .row-label-right div {
+            width: 24px; height: 30px; display: flex; align-items: center; justify-content: center;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(10, 30px);
+            grid-template-rows: repeat(10, 30px);
+            gap: 2px;
+            background: #1a252f;
+            padding: 4px;
+            border-radius: 6px;
+            border: 1px solid #4a6274;
+        }
+        .cell {
+            width: 30px; height: 30px; background: #ecf0f1; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; font-size: 18px; border-radius: 3px; color: #2c3e50;
+            transition: 0.15s; -webkit-tap-highlight-color: transparent; user-select: none;
+        }
+        .cell:active { transform: scale(0.92); }
+        .cell.ship { background: #3b5998; }
+        .cell.hit { background: #c0392b; color: white; animation: pop 0.2s ease; }
+        .cell.miss { background: #95a5a6; color: #2c3e50; }
+        @keyframes pop { 0% { transform: scale(1.2); } 100% { transform: scale(1); } }
+        .controls {
+            margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+        }
+        button {
+            padding: 12px 18px; font-size: 14px; font-weight: bold; text-transform: uppercase;
+            border: none; border-radius: 8px; cursor: pointer; letter-spacing: 1px;
+            transition: 0.2s; box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            font-family: 'Courier New', monospace; -webkit-tap-highlight-color: transparent;
+        }
+        button:active:not(:disabled) { transform: scale(0.94); box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        button:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+        .btn-shuffle { background: #e67e22; color: white; }
+        .btn-battle { background: #e74c3c; color: white; }
+        .btn-continue { background: #27ae60; color: white; }
+        .btn-finish { background: #8e44ad; color: white; }
+        .btn-clear-stats { background: #555; color: #bbb; font-size: 12px; padding: 8px 14px; }
+        .winner-select {
+            display: none; margin-top: 12px; gap: 10px; align-items: center;
+            flex-wrap: wrap; justify-content: center; background: #243342;
+            padding: 12px; border-radius: 10px; border: 2px solid #8e44ad;
+        }
+        .winner-select span { font-weight: bold; color: #f1c40f; font-size: 15px; }
+        .btn-win-me { background: #2ecc71; color: white; }
+        .btn-win-opp { background: #e74c3c; color: white; }
+        .btn-cancel { background: #7f8c8d; color: white; }
+        .stats-container {
+            margin-top: 16px; background: #1a252f; padding: 14px; border-radius: 12px;
+            border: 2px solid #4a6274; width: 100%; max-width: 520px; max-height: 220px; overflow-y: auto;
+        }
+        .stats-container h3 { text-align: center; color: #f1c40f; margin-bottom: 10px; font-size: 17px; letter-spacing: 1px; }
+        .stats-container .stat-row {
+            font-size: 13px; padding: 4px 0; border-bottom: 1px solid #2c3e50; color: #bdc3c7;
+        }
+        .stats-summary { font-weight: bold; color: #2ecc71; margin-top: 8px; text-align: center; font-size: 14px; }
+        .footer {
+            margin-top: 20px; text-align: center; color: #7f8c8d;
+            font-size: 12px; letter-spacing: 1px; padding: 10px;
+        }
+        .footer span { color: #d4a017; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>✈️ САМОЛЕТКУБ ✈️</h1>
+    <div class="scoreboard" id="scoreboard"></div>
+    <div class="names-container">
+        <input type="text" id="myName" placeholder="Моё имя" maxlength="12">
+        <input type="text" id="oppName" placeholder="Соперник" maxlength="12">
+    </div>
+    <div class="game-container">
+        <div class="player-section">
+            <h2>🛡️ МОЙ ФЛОТ</h2>
+            <div class="field-container">
+                <div class="col-labels-top" id="colLabelsMyTop"></div>
+                <div class="field-row">
+                    <div class="row-label-left" id="rowLabelsMyLeft"></div>
+                    <div class="grid" id="myGrid"></div>
+                    <div class="row-label-right" id="rowLabelsMyRight"></div>
+                </div>
+                <div class="col-labels-bottom" id="colLabelsMyBottom"></div>
+            </div>
+        </div>
+        <div class="player-section">
+            <h2>🎯 ВРАГ</h2>
+            <div class="field-container">
+                <div class="col-labels-top" id="colLabelsEnTop"></div>
+                <div class="field-row">
+                    <div class="row-label-left" id="rowLabelsEnLeft"></div>
+                    <div class="grid" id="enemyGrid"></div>
+                    <div class="row-label-right" id="rowLabelsEnRight"></div>
+                </div>
+                <div class="col-labels-bottom" id="colLabelsEnBottom"></div>
+            </div>
+        </div>
+    </div>
+    <div class="controls">
+        <button class="btn-shuffle" id="btnShuffle">🔀 Перемешать</button>
+        <button class="btn-battle" id="btnBattle">⚔️ В БОЙ</button>
+        <button class="btn-continue" id="btnContinue">▶️ Играем дальше</button>
+        <button class="btn-finish" id="btnFinish">🏁 Завершить партию</button>
+    </div>
+    <div class="winner-select" id="winnerSelect">
+        <span>Кто победил?</span>
+        <button class="btn-win-me" id="btnWinMe">🏆 Я</button>
+        <button class="btn-win-opp" id="btnWinOpp">💀 Соперник</button>
+        <button class="btn-cancel" id="btnCancelFinish">❌ Отмена</button>
+    </div>
+    <div class="stats-container" id="statsContainer">
+        <h3>📊 СТАТИСТИКА</h3>
+        <div id="statsList">Нет сыгранных партий</div>
+        <div class="stats-summary" id="statsSummary"></div>
+        <button class="btn-clear-stats" id="btnClearStats">🗑 Сбросить статистику</button>
+    </div>
+    <div class="footer">
+        © <span>2026</span> | Разработчик: <span>Сахаяна Скрябина</span>
+    </div>
+
+    <script>
+        // ============ Service Worker ============
+        if ('serviceWorker' in navigator) {
+            const swCode = `
+                self.addEventListener('install', (e) => {
+                    e.waitUntil(
+                        caches.open('samoletkub-v1').then(cache => {
+                            return cache.addAll(['./']);
+                        })
+                    );
+                    self.skipWaiting();
+                });
+                self.addEventListener('fetch', (e) => {
+                    e.respondWith(
+                        caches.match(e.request).then(response => {
+                            return response || fetch(e.request);
+                        })
+                    );
+                });
+            `;
+            const blob = new Blob([swCode], { type: 'application/javascript' });
+            const swUrl = URL.createObjectURL(blob);
+            navigator.serviceWorker.register(swUrl).catch(() => {});
+        }
+
+        // ============ Игра ============
+        (function() {
+            const SIZE = 10;
+            const LETTERS = ['С', 'А', 'М', 'О', 'Л', 'Е', 'Т', 'К', 'У', 'Б'];
+
+            const FIGURES_BASE = {
+                airplane: [[0,2],[1,0],[1,1],[1,2],[1,3],[1,4],[2,2],[3,1],[3,2],[3,3]],
+                steamship: [[0,1],[0,3],[1,0],[1,1],[1,2],[1,3],[1,4]],
+                tank: [[0,1],[1,0],[1,1],[1,2]],
+                human: [[0,0]],
+                headquarters: [[0,0]]
+            };
+
+            const PLAYER_FIGS = [
+                { type: 'airplane', count: 1 },
+                { type: 'steamship', count: 1 },
+                { type: 'tank', count: 2 },
+                { type: 'human', count: 5 },
+                { type: 'headquarters', count: 1 }
+            ];
+
+            function rotateFigure(coords, rotation) {
+                if (rotation === 0) return coords;
+                let rotated = coords;
+                for (let r = 0; r < rotation; r++) rotated = rotated.map(([y, x]) => [x, -y]);
+                const minRow = Math.min(...rotated.map(([y]) => y));
+                const minCol = Math.min(...rotated.map(([_, x]) => x));
+                return rotated.map(([y, x]) => [y - minRow, x - minCol]);
+            }
+
+            function getRandomRotation() { return Math.floor(Math.random() * 4); }
+
+            let myShips = [];
+            let myGridData = Array(SIZE).fill().map(() => Array(SIZE).fill(0));
+            let myMarks = Array(SIZE).fill().map(() => Array(SIZE).fill(''));
+            let enemyMarks = Array(SIZE).fill().map(() => Array(SIZE).fill(''));
+            let battleMode = false;
+
+            const myGridEl = document.getElementById('myGrid');
+            const enemyGridEl = document.getElementById('enemyGrid');
+            const winnerSelect = document.getElementById('winnerSelect');
+            const scoreboard = document.getElementById('scoreboard');
+            const statsList = document.getElementById('statsList');
+            const statsSummary = document.getElementById('statsSummary');
+            const myNameInput = document.getElementById('myName');
+            const oppNameInput = document.getElementById('oppName');
+            const btnShuffle = document.getElementById('btnShuffle');
+            const btnBattle = document.getElementById('btnBattle');
+
+            function createLabels(topId, bottomId, leftId, rightId) {
+                [document.getElementById(topId), document.getElementById(bottomId)].forEach(el => { el.innerHTML = ''; for (let i = 0; i < SIZE; i++) { const d = document.createElement('div'); d.textContent = LETTERS[i]; el.appendChild(d); } });
+                [document.getElementById(leftId), document.getElementById(rightId)].forEach(el => { el.innerHTML = ''; for (let i = 1; i <= SIZE; i++) { const d = document.createElement('div'); d.textContent = i; el.appendChild(d); } });
+            }
+            createLabels('colLabelsMyTop', 'colLabelsMyBottom', 'rowLabelsMyLeft', 'rowLabelsMyRight');
+            createLabels('colLabelsEnTop', 'colLabelsEnBottom', 'rowLabelsEnLeft', 'rowLabelsEnRight');
+
+            function createGrid(container, isEnemy) {
+                container.innerHTML = '';
+                for (let r = 0; r < SIZE; r++)
+                    for (let c = 0; c < SIZE; c++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'cell';
+                        cell.dataset.row = r;
+                        cell.dataset.col = c;
+                        cell.addEventListener('click', () => cellClick(r, c, isEnemy));
+                        container.appendChild(cell);
+                    }
+            }
+            createGrid(myGridEl, false);
+            createGrid(enemyGridEl, true);
+
+            function canPlace(grid, coords, oR, oC) {
+                for (let [dr, dc] of coords) {
+                    const r = oR + dr, c = oC + dc;
+                    if (r < 0 || r >= SIZE || c < 0 || c >= SIZE) return false;
+                    if (grid[r][c] !== 0) return false;
+                    for (let ddr = -1; ddr <= 1; ddr++)
+                        for (let ddc = -1; ddc <= 1; ddc++) {
+                            if (ddr === 0 && ddc === 0) continue;
+                            const nr = r + ddr, nc = c + ddc;
+                            if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE) {
+                                const isPart = coords.some(([fdr, fdc]) => oR + fdr === nr && oC + fdc === nc);
+                                if (!isPart && grid[nr][nc] !== 0) return false;
+                            }
+                        }
+                }
+                return true;
+            }
+
+            function placeFigure(grid, coords, oR, oC, id) {
+                const cells = [];
+                for (let [dr, dc] of coords) { const r = oR + dr, c = oC + dc; grid[r][c] = id; cells.push([r, c]); }
+                return cells;
+            }
+
+            function randomPlacement() {
+                const grid = Array(SIZE).fill().map(() => Array(SIZE).fill(0));
+                const ships = [];
+                let id = 1;
+                const list = [];
+                for (let fig of PLAYER_FIGS) for (let i = 0; i < fig.count; i++) list.push({ type: fig.type });
+                for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }
+                for (let fig of list) {
+                    let placed = false;
+                    for (let a = 0; a < 3000; a++) {
+                        const oR = Math.floor(Math.random() * SIZE), oC = Math.floor(Math.random() * SIZE);
+                        const rot = (fig.type === 'human' || fig.type === 'headquarters') ? 0 : getRandomRotation();
+                        const coords = rotateFigure(FIGURES_BASE[fig.type], rot);
+                        if (canPlace(grid, coords, oR, oC)) {
+                            const cells = placeFigure(grid, coords, oR, oC, id);
+                            ships.push({ id, cells, type: fig.type, alive: true });
+                            id++; placed = true; break;
+                        }
+                    }
+                    if (!placed) return null;
+                }
+                return { grid, ships };
+            }
+
+            function shuffleMyFleet() {
+                if (battleMode) return;
+                let result = null, tries = 0;
+                while (!result && tries < 15) { result = randomPlacement(); tries++; }
+                if (!result) { alert('Не удалось расставить флот.'); return; }
+                myShips = result.ships;
+                myGridData = result.grid;
+                myMarks = Array(SIZE).fill().map(() => Array(SIZE).fill(''));
+                renderAll();
+            }
+
+            function renderAll() {
+                renderGrid(myGridEl, myGridData, myMarks, true);
+                renderGrid(enemyGridEl, null, enemyMarks, false);
+            }
+
+            function renderGrid(container, gridData, marks, showShips) {
+                const cells = container.querySelectorAll('.cell');
+                cells.forEach(cell => {
+                    const r = parseInt(cell.dataset.row), c = parseInt(cell.dataset.col);
+                    cell.classList.remove('ship', 'hit', 'miss');
+                    cell.textContent = '';
+                    if (showShips && gridData && gridData[r][c] !== 0) cell.classList.add('ship');
+                    if (marks[r][c] === 'hit') { cell.classList.add('hit'); cell.textContent = 'X'; }
+                    else if (marks[r][c] === 'miss') { cell.classList.add('miss'); cell.textContent = '·'; }
+                });
+            }
+
+            function cellClick(r, c, isEnemy) {
+                if (isEnemy) {
+                    if (enemyMarks[r][c] === '') enemyMarks[r][c] = 'miss';
+                    else if (enemyMarks[r][c] === 'miss') enemyMarks[r][c] = 'hit';
+                    else if (enemyMarks[r][c] === 'hit') enemyMarks[r][c] = '';
+                } else {
+                    if (myMarks[r][c] === '') {
+                        if (myGridData[r][c] !== 0) myMarks[r][c] = 'hit';
+                        else myMarks[r][c] = 'miss';
+                    } else {
+                        myMarks[r][c] = '';
+                    }
+                }
+                renderAll();
+            }
+
+            function resetMarks() {
+                myMarks = Array(SIZE).fill().map(() => Array(SIZE).fill(''));
+                enemyMarks = Array(SIZE).fill().map(() => Array(SIZE).fill(''));
+                renderAll();
+            }
+
+            function startBattle() {
+                if (myShips.length === 0) { alert('Сначала нажми «Перемешать»!'); return; }
+                battleMode = true;
+                btnShuffle.disabled = true;
+                btnBattle.disabled = true;
+                saveNames();
+            }
+
+            function stopBattle() {
+                battleMode = false;
+                btnShuffle.disabled = false;
+                btnBattle.disabled = false;
+            }
+
+            const STORAGE_KEY = 'samoletkub_stats_V3';
+            function getAllStats() { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : {}; }
+            function saveAllStats(s) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
+            function getPairKey(a, b) { return [(a || 'Я').trim().toLowerCase(), (b || 'Соперник').trim().toLowerCase()].sort().join('_vs_'); }
+            function getPairStats(a, b) { const all = getAllStats(); const key = getPairKey(a, b); return all[key] || []; }
+            function savePairStats(a, b, s) { const all = getAllStats(); all[getPairKey(a, b)] = s; saveAllStats(all); }
+
+            function addGameResult(my, opp, winnerIsMe, cb) {
+                const s = getPairStats(my, opp);
+                s.push({ myName: my || 'Я', oppName: opp || 'Соперник', winnerIsMe, date: new Date().toLocaleString('ru-RU') });
+                savePairStats(my, opp, s);
+                displayStats(); updateScoreboard();
+                if (cb) cb();
+            }
+
+            function clearCurrentStats() {
+                const my = myNameInput.value, opp = oppNameInput.value;
+                if (confirm('Сбросить статистику для «' + (my || 'Я') + ' vs ' + (opp || 'Соперник') + '»?')) {
+                    savePairStats(my, opp, []);
+                    displayStats(); updateScoreboard();
+                }
+            }
+
+            function updateScoreboard() {
+                const my = myNameInput.value || 'Я', opp = oppNameInput.value || 'Соперник';
+                const s = getPairStats(my, opp);
+                if (s.length === 0) { scoreboard.style.display = 'none'; return; }
+                let mw = 0, ow = 0;
+                s.forEach(x => { if (x.winnerIsMe) mw++; else ow++; });
+                scoreboard.textContent = `🏆 ${my} ${mw} — ${ow} ${opp}`;
+                scoreboard.style.display = 'block';
+            }
+
+            function displayStats() {
+                const my = myNameInput.value || 'Я', opp = oppNameInput.value || 'Соперник';
+                const s = getPairStats(my, opp);
+                if (s.length === 0) {
+                    statsList.innerHTML = 'Нет сыгранных партий';
+                    statsSummary.textContent = '';
+                    scoreboard.style.display = 'none';
+                } else {
+                    let html = '', mw = 0, ow = 0;
+                    s.forEach((x, i) => {
+                        html += `<div class="stat-row">Партия ${i+1}: ${x.myName} ${x.winnerIsMe?'1':'0'} - ${x.oppName} ${x.winnerIsMe?'0':'1'} (${x.date})</div>`;
+                        if (x.winnerIsMe) mw++; else ow++;
+                    });
+                    statsList.innerHTML = html;
+                    statsSummary.textContent = `Общий счёт: ${my} ${mw} — ${ow} ${opp}`;
+                    updateScoreboard();
+                }
+            }
+
+            function saveNames() { localStorage.setItem('samoletkub_myName', myNameInput.value); localStorage.setItem('samoletkub_oppName', oppNameInput.value); }
+            function loadNames() { const m = localStorage.getItem('samoletkub_myName'); const o = localStorage.getItem('samoletkub_oppName'); if (m) myNameInput.value = m; if (o) oppNameInput.value = o; }
+            function onNamesChanged() { saveNames(); displayStats(); updateScoreboard(); }
+
+            function showWinnerSelect(cb) { winnerSelect.style.display = 'flex'; winnerSelect._callback = cb; }
+            function hideWinnerSelect() { winnerSelect.style.display = 'none'; winnerSelect._callback = null; }
+
+            myNameInput.addEventListener('input', onNamesChanged);
+            oppNameInput.addEventListener('input', onNamesChanged);
+
+            document.getElementById('btnShuffle').addEventListener('click', () => { shuffleMyFleet(); saveNames(); btnBattle.disabled = false; });
+            document.getElementById('btnBattle').addEventListener('click', startBattle);
+            document.getElementById('btnContinue').addEventListener('click', () => {
+                if (myShips.length === 0) { alert('Сначала нажми «Перемешать»!'); return; }
+                saveNames(); showWinnerSelect(() => { resetMarks(); stopBattle(); });
+            });
+            document.getElementById('btnFinish').addEventListener('click', () => {
+                if (myShips.length === 0) { alert('Сначала нажми «Перемешать»!'); return; }
+                saveNames(); showWinnerSelect(() => { stopBattle(); });
+            });
+            document.getElementById('btnWinMe').addEventListener('click', () => {
+                const cb = winnerSelect._callback;
+                addGameResult(myNameInput.value, oppNameInput.value, true, cb);
+                hideWinnerSelect();
+            });
+            document.getElementById('btnWinOpp').addEventListener('click', () => {
+                const cb = winnerSelect._callback;
+                addGameResult(myNameInput.value, oppNameInput.value, false, cb);
+                hideWinnerSelect();
+            });
+            document.getElementById('btnCancelFinish').addEventListener('click', hideWinnerSelect);
+            document.getElementById('btnClearStats').addEventListener('click', clearCurrentStats);
+
+            loadNames(); displayStats(); updateScoreboard();
+            btnBattle.disabled = true;
+        })();
+    </script>
+</body>
+</html>
