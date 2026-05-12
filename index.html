@@ -197,7 +197,7 @@
 
     <script>
         if ('serviceWorker' in navigator) {
-            const swCode = `self.addEventListener('install',(e)=>{e.waitUntil(caches.open('samoletkub-v8').then(c=>c.addAll(['./'])));self.skipWaiting();});self.addEventListener('fetch',(e)=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));});`;
+            const swCode = `self.addEventListener('install',(e)=>{e.waitUntil(caches.open('samoletkub-v9').then(c=>c.addAll(['./'])));self.skipWaiting();});self.addEventListener('fetch',(e)=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));});`;
             navigator.serviceWorker.register(URL.createObjectURL(new Blob([swCode],{type:'application/javascript'}))).catch(()=>{});
         }
 
@@ -431,8 +431,6 @@
                 return map[type] || type;
             }
 
-            // ============ УМНЫЙ ИИ БОТА ============
-
             function getAvailableCells() {
                 const available = [];
                 for (let r = 0; r < SIZE; r++)
@@ -444,8 +442,7 @@
             function figureMatches(wounded, figureCoords, offsetR, offsetC) {
                 const cells = new Set();
                 for (let [dr, dc] of figureCoords) {
-                    const r = offsetR + dr;
-                    const c = offsetC + dc;
+                    const r = offsetR + dr, c = offsetC + dc;
                     if (r < 0 || r >= SIZE || c < 0 || c >= SIZE) return false;
                     if (myMarks[r][c] === 'miss') return false;
                     cells.add(r + ',' + c);
@@ -459,13 +456,11 @@
             function getPossiblePositions(wounded) {
                 const positions = [];
                 const possibleTypes = ['airplane', 'steamship', 'tank', 'human', 'headquarters'];
-                
                 for (let type of possibleTypes) {
                     for (let variant of ALL_FIGURE_VARIANTS[type]) {
                         for (let [hr, hc] of wounded.hits) {
                             for (let [dr, dc] of variant) {
-                                const offsetR = hr - dr;
-                                const offsetC = hc - dc;
+                                const offsetR = hr - dr, offsetC = hc - dc;
                                 if (figureMatches(wounded, variant, offsetR, offsetC)) {
                                     positions.push({ type, coords: variant, offsetR, offsetC });
                                 }
@@ -473,7 +468,6 @@
                         }
                     }
                 }
-                
                 const unique = [];
                 const seen = new Set();
                 for (let pos of positions) {
@@ -484,39 +478,31 @@
             }
 
             function collectSmartTargets() {
-                const targets = [];
-                const added = new Set();
-                
+                const targets = [], added = new Set();
                 for (let wounded of botWoundedShips) {
                     const positions = getPossiblePositions(wounded);
-                    
                     for (let pos of positions) {
                         for (let [dr, dc] of pos.coords) {
-                            const r = pos.offsetR + dr;
-                            const c = pos.offsetC + dc;
+                            const r = pos.offsetR + dr, c = pos.offsetC + dc;
                             const key = r + ',' + c;
                             if (myMarks[r][c] === '' && !added.has(key)) {
                                 let inAll = true;
                                 for (let pos2 of positions) {
-                                    const hasCell = pos2.coords.some(([dr2, dc2]) => 
-                                        pos2.offsetR + dr2 === r && pos2.offsetC + dc2 === c
-                                    );
+                                    const hasCell = pos2.coords.some(([dr2, dc2]) => pos2.offsetR + dr2 === r && pos2.offsetC + dc2 === c);
                                     if (!hasCell) { inAll = false; break; }
                                 }
-                                if (inAll) { targets.unshift([r, c]); }
-                                else { targets.push([r, c]); }
+                                if (inAll) targets.unshift([r, c]);
+                                else targets.push([r, c]);
                                 added.add(key);
                             }
                         }
                     }
                 }
-                
                 return targets;
             }
 
             function botTurn() {
                 if (gameOver || gameMode !== 'bot') return;
-                
                 if (botDifficulty === 'easy') {
                     const available = getAvailableCells();
                     if (available.length === 0) return;
@@ -524,11 +510,8 @@
                     processBotShot(r, c);
                     return;
                 }
-                
                 const smartTargets = collectSmartTargets();
-                
                 let targetR, targetC;
-                
                 if (smartTargets.length > 0) {
                     [targetR, targetC] = smartTargets[0];
                 } else {
@@ -536,28 +519,20 @@
                     if (available.length === 0) return;
                     [targetR, targetC] = available[Math.floor(Math.random() * available.length)];
                 }
-                
                 processBotShot(targetR, targetC);
             }
 
             function processBotShot(targetR, targetC) {
                 if (myGridData[targetR][targetC] !== 0) {
-                    // ПОПАДАНИЕ
                     myMarks[targetR][targetC] = 'hit';
-                    
                     const shipId = myGridData[targetR][targetC];
-                    let woundedShip = botWoundedShips.find(w =>
-                        w.hits.some(([hr, hc]) => myGridData[hr][hc] === shipId)
-                    );
-                    
+                    let woundedShip = botWoundedShips.find(w => w.hits.some(([hr, hc]) => myGridData[hr][hc] === shipId));
                     if (!woundedShip) {
                         woundedShip = { hits: [], firstHit: [targetR, targetC], shipId };
                         botWoundedShips.push(woundedShip);
                     }
-                    
                     woundedShip.hits.push([targetR, targetC]);
-                    
-                    // Проверка на убийство
+
                     let killedShip = null;
                     for (let ship of myShips) {
                         if (!ship.alive) continue;
@@ -570,37 +545,35 @@
                             break;
                         }
                     }
-                    
+
                     if (killedShip) {
-                        // ЗАКРАШИВАЕМ ВСЕ СОСЕДНИЕ КЛЕТКИ ВОКРУГ УБИТОЙ ФИГУРЫ
                         for (let [sr, sc] of killedShip.cells) {
                             for (let dr = -1; dr <= 1; dr++) {
                                 for (let dc = -1; dc <= 1; dc++) {
                                     if (dr === 0 && dc === 0) continue;
-                                    const nr = sr + dr;
-                                    const nc = sc + dc;
+                                    const nr = sr + dr, nc = sc + dc;
                                     if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && myMarks[nr][nc] === '') {
                                         myMarks[nr][nc] = 'miss';
                                     }
                                 }
                             }
                         }
-                        statusMessage.textContent = `😵 Бот сбил ${getShipName(killedShip.type)}! Твой ход.`;
-                        myTurn = true;
-                        renderAll();
                         if (myShips.every(s => !s.alive)) {
-                            gameOver = true; battleMode = false;
                             statusMessage.textContent = '💀 ПОРАЖЕНИЕ. Бот уничтожил твой флот...';
-                            stopBattle();
+                            myTurn = true; gameOver = true; battleMode = false;
+                            stopBattle(); renderAll();
+                            return;
                         }
+                        statusMessage.textContent = `😵 Бот сбил ${getShipName(killedShip.type)}! Продолжает стрелять...`;
+                        renderAll();
+                        setTimeout(botTurn, 500);
                         return;
                     }
-                    
+
                     statusMessage.textContent = '😡 Бот попал! Продолжает стрелять...';
                     renderAll();
                     setTimeout(botTurn, 500);
                 } else {
-                    // ПРОМАХ
                     myMarks[targetR][targetC] = 'miss';
                     renderAll();
                     statusMessage.textContent = '😌 Бот промахнулся. Твой ход!';
@@ -637,8 +610,7 @@
                 if (gameMode === 'bot' && !gameOver) statusMessage.textContent = '';
             }
 
-            const STORAGE_KEY = 'samoletkub_stats_V10';
-
+            const STORAGE_KEY = 'samoletkub_stats_V11';
             function getAllStats() { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : {}; }
             function saveAllStats(s) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
             function getPairKey(a, b) { return [(a || 'Я').trim().toLowerCase(), (b || 'Соперник').trim().toLowerCase()].sort().join('_vs_'); }
@@ -675,9 +647,7 @@
                     let html = '', mw = 0, ow = 0;
                     s.forEach((x, i) => {
                         let extra = x.mode === 'bot' ? '🤖' : '👥';
-                        if (x.difficulty === 'easy') extra += '🟢';
-                        else if (x.difficulty === 'medium') extra += '🟡';
-                        else if (x.difficulty === 'hard') extra += '🔴';
+                        if (x.difficulty === 'easy') extra += '🟢'; else if (x.difficulty === 'medium') extra += '🟡'; else if (x.difficulty === 'hard') extra += '🔴';
                         html += `<div class="stat-row">Партия ${i+1}: ${x.myName} ${x.winnerIsMe?'1':'0'} - ${x.oppName} ${x.winnerIsMe?'0':'1'} (${x.date}) ${extra}</div>`;
                         if (x.winnerIsMe) mw++; else ow++;
                     });
