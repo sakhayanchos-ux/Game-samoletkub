@@ -87,8 +87,8 @@
         }
         .cell:active { transform: scale(0.92); }
         .cell.ship { background: #3b5998; }
-        .cell.hit { background: #c0392b; color: white; animation: pop 0.2s ease; }
-        .cell.miss { background: #95a5a6; color: #2c3e50; }
+        .cell.hit { background: #c0392b !important; color: white; animation: pop 0.2s ease; }
+        .cell.miss { background: #95a5a6 !important; color: #2c3e50; }
         .cell.revealed { background: #5b7bb5; }
         @keyframes pop { 0% { transform: scale(1.2); } 100% { transform: scale(1); } }
         .controls { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
@@ -196,7 +196,7 @@
 
     <script>
         if ('serviceWorker' in navigator) {
-            const swCode = `self.addEventListener('install',(e)=>{e.waitUntil(caches.open('samoletkub-v12').then(c=>c.addAll(['./'])));self.skipWaiting();});self.addEventListener('fetch',(e)=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));});`;
+            const swCode = `self.addEventListener('install',(e)=>{e.waitUntil(caches.open('samoletkub-v13').then(c=>c.addAll(['./'])));self.skipWaiting();});self.addEventListener('fetch',(e)=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));});`;
             navigator.serviceWorker.register(URL.createObjectURL(new Blob([swCode],{type:'application/javascript'}))).catch(()=>{});
         }
 
@@ -358,15 +358,15 @@
                     const r = parseInt(cell.dataset.row), c = parseInt(cell.dataset.col);
                     cell.classList.remove('ship', 'hit', 'miss', 'revealed');
                     cell.textContent = '';
-                    if (showShips && gridData && gridData[r][c] !== 0) {
-                        cell.classList.add('revealed');
-                    }
+                    
                     if (marks[r][c] === 'hit') { 
                         cell.classList.add('hit'); 
                         cell.textContent = 'X'; 
                     } else if (marks[r][c] === 'miss') { 
                         cell.classList.add('miss'); 
                         cell.textContent = '·'; 
+                    } else if (showShips && gridData && gridData[r][c] !== 0) {
+                        cell.classList.add('revealed');
                     }
                 });
             }
@@ -518,7 +518,7 @@
 
             function stopBattle() { battleMode=false;btnShuffle.disabled=false;btnBattle.disabled=false; }
 
-            const SK='samoletkub_stats_V14';
+            const SK='samoletkub_stats_V15';
             function gAS(){const r=localStorage.getItem(SK);return r?JSON.parse(r):{};}
             function sAS(s){localStorage.setItem(SK,JSON.stringify(s));}
             function gPK(a,b){return[(a||'Я').trim().toLowerCase(),(b||'Соперник').trim().toLowerCase()].sort().join('_vs_');}
