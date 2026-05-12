@@ -91,6 +91,7 @@
         .cell.ship { background: #3b5998; }
         .cell.hit { background: #c0392b; color: white; animation: pop 0.2s ease; }
         .cell.miss { background: #95a5a6; color: #2c3e50; }
+        .cell.ship-revealed { background: #5b7bb5; border: 1px solid #3b5998; }
         @keyframes pop { 0% { transform: scale(1.2); } 100% { transform: scale(1); } }
         .controls { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
         button {
@@ -197,7 +198,7 @@
 
     <script>
         if ('serviceWorker' in navigator) {
-            const swCode = `self.addEventListener('install',(e)=>{e.waitUntil(caches.open('samoletkub-v9').then(c=>c.addAll(['./'])));self.skipWaiting();});self.addEventListener('fetch',(e)=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));});`;
+            const swCode = `self.addEventListener('install',(e)=>{e.waitUntil(caches.open('samoletkub-v10').then(c=>c.addAll(['./'])));self.skipWaiting();});self.addEventListener('fetch',(e)=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));});`;
             navigator.serviceWorker.register(URL.createObjectURL(new Blob([swCode],{type:'application/javascript'}))).catch(()=>{});
         }
 
@@ -233,13 +234,10 @@
             const ALL_FIGURE_VARIANTS = {};
             for (let [name, coords] of Object.entries(FIGURES_BASE)) {
                 ALL_FIGURE_VARIANTS[name] = [];
-                for (let rot = 0; rot < 4; rot++) {
-                    ALL_FIGURE_VARIANTS[name].push(rotateFigure(coords, rot));
-                }
+                for (let rot = 0; rot < 4; rot++) ALL_FIGURE_VARIANTS[name].push(rotateFigure(coords, rot));
             }
 
-            let gameMode = 'friend';
-            let botDifficulty = 'easy';
+            let gameMode = 'friend', botDifficulty = 'easy';
             let myShips = [], enemyShips = [];
             let myGridData = Array(SIZE).fill().map(() => Array(SIZE).fill(0));
             let enemyGridData = Array(SIZE).fill().map(() => Array(SIZE).fill(0));
@@ -247,6 +245,7 @@
             let enemyMarks = Array(SIZE).fill().map(() => Array(SIZE).fill(''));
             let battleMode = false, gameOver = false, myTurn = true;
             let botWoundedShips = [];
+            let showEnemyShips = false; // Флаг для показа вражеских фигур
 
             const myGridEl = document.getElementById('myGrid');
             const enemyGridEl = document.getElementById('enemyGrid');
@@ -280,32 +279,27 @@
 
             function createGrid(container, isEnemy) {
                 container.innerHTML = '';
-                for (let r = 0; r < SIZE; r++)
-                    for (let c = 0; c < SIZE; c++) {
-                        const cell = document.createElement('div');
-                        cell.className = 'cell';
-                        cell.dataset.row = r; cell.dataset.col = c;
-                        cell.addEventListener('click', () => cellClick(r, c, isEnemy));
-                        container.appendChild(cell);
-                    }
+                for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) {
+                    const cell = document.createElement('div'); cell.className = 'cell';
+                    cell.dataset.row = r; cell.dataset.col = c;
+                    cell.addEventListener('click', () => cellClick(r, c, isEnemy));
+                    container.appendChild(cell);
+                }
             }
-            createGrid(myGridEl, false);
-            createGrid(enemyGridEl, true);
+            createGrid(myGridEl, false); createGrid(enemyGridEl, true);
 
             function canPlace(grid, coords, oR, oC) {
                 for (let [dr, dc] of coords) {
                     const r = oR + dr, c = oC + dc;
                     if (r < 0 || r >= SIZE || c < 0 || c >= SIZE) return false;
                     if (grid[r][c] !== 0) return false;
-                    for (let ddr = -1; ddr <= 1; ddr++)
-                        for (let ddc = -1; ddc <= 1; ddc++) {
-                            if (ddr === 0 && ddc === 0) continue;
-                            const nr = r + ddr, nc = c + ddc;
-                            if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE) {
-                                const isPart = coords.some(([fdr, fdc]) => oR + fdr === nr && oC + fdc === nc);
-                                if (!isPart && grid[nr][nc] !== 0) return false;
-                            }
+                    for (let ddr = -1; ddr <= 1; ddr++) for (let ddc = -1; ddc <= 1; ddc++) {
+                        if (ddr === 0 && ddc === 0) continue;
+                        const nr = r + ddr, nc = c + ddc;
+                        if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE) {
+                            if (!coords.some(([fdr, fdc]) => oR + fdr === nr && oC + fdc === nc) && grid[nr][nc] !== 0) return false;
                         }
+                    }
                 }
                 return true;
             }
@@ -318,8 +312,7 @@
 
             function randomPlacement() {
                 const grid = Array(SIZE).fill().map(() => Array(SIZE).fill(0));
-                const ships = [];
-                let id = 1;
+                const ships = []; let id = 1;
                 const list = [];
                 for (let fig of PLAYER_FIGS) for (let i = 0; i < fig.count; i++) list.push({ type: fig.type });
                 for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }
@@ -328,9 +321,8 @@
                     for (let a = 0; a < 3000; a++) {
                         const oR = Math.floor(Math.random() * SIZE), oC = Math.floor(Math.random() * SIZE);
                         const rot = (fig.type === 'human' || fig.type === 'headquarters') ? 0 : Math.floor(Math.random() * 4);
-                        const coords = rotateFigure(FIGURES_BASE[fig.type], rot);
-                        if (canPlace(grid, coords, oR, oC)) {
-                            const cells = placeFigure(grid, coords, oR, oC, id);
+                        if (canPlace(grid, rotateFigure(FIGURES_BASE[fig.type], rot), oR, oC)) {
+                            const cells = placeFigure(grid, rotateFigure(FIGURES_BASE[fig.type], rot), oR, oC, id);
                             ships.push({ id, cells, type: fig.type, alive: true });
                             id++; placed = true; break;
                         }
@@ -342,37 +334,35 @@
 
             function shuffleMyFleet() {
                 if (battleMode) return;
-                let result = null, tries = 0;
-                while (!result && tries < 15) { result = randomPlacement(); tries++; }
-                if (!result) { alert('Не удалось расставить флот.'); return; }
-                myShips = result.ships;
-                myGridData = result.grid;
+                let r = null; for (let t = 0; t < 15 && !r; t++) r = randomPlacement();
+                if (!r) { alert('Не удалось расставить флот.'); return; }
+                myShips = r.ships; myGridData = r.grid;
                 myMarks = Array(SIZE).fill().map(() => Array(SIZE).fill(''));
+                showEnemyShips = false;
                 renderAll();
             }
 
             function shuffleEnemyFleet() {
-                let result = null, tries = 0;
-                while (!result && tries < 15) { result = randomPlacement(); tries++; }
-                if (!result) { alert('Не удалось расставить флот врага.'); return; }
-                enemyShips = result.ships;
-                enemyGridData = result.grid;
+                let r = null; for (let t = 0; t < 15 && !r; t++) r = randomPlacement();
+                if (!r) { alert('Не удалось расставить флот врага.'); return; }
+                enemyShips = r.ships; enemyGridData = r.grid;
                 enemyMarks = Array(SIZE).fill().map(() => Array(SIZE).fill(''));
                 renderAll();
             }
 
             function renderAll() {
                 renderGrid(myGridEl, myGridData, myMarks, true);
-                renderGrid(enemyGridEl, null, enemyMarks, false);
+                renderGrid(enemyGridEl, enemyGridData, enemyMarks, showEnemyShips);
             }
-
+            
             function renderGrid(container, gridData, marks, showShips) {
-                const cells = container.querySelectorAll('.cell');
-                cells.forEach(cell => {
+                container.querySelectorAll('.cell').forEach(cell => {
                     const r = parseInt(cell.dataset.row), c = parseInt(cell.dataset.col);
-                    cell.classList.remove('ship', 'hit', 'miss');
+                    cell.classList.remove('ship', 'hit', 'miss', 'ship-revealed');
                     cell.textContent = '';
-                    if (showShips && gridData && gridData[r][c] !== 0) cell.classList.add('ship');
+                    if (showShips && gridData && gridData[r][c] !== 0) {
+                        cell.classList.add('ship-revealed');
+                    }
                     if (marks[r][c] === 'hit') { cell.classList.add('hit'); cell.textContent = 'X'; }
                     else if (marks[r][c] === 'miss') { cell.classList.add('miss'); cell.textContent = '·'; }
                 });
@@ -382,329 +372,189 @@
                 if (gameOver) return;
                 if (isEnemy) {
                     if (gameMode === 'bot') {
-                        if (!battleMode || !myTurn) return;
-                        if (enemyMarks[r][c] !== '') return;
+                        if (!battleMode || !myTurn || enemyMarks[r][c] !== '') return;
                         if (enemyGridData[r][c] !== 0) {
-                            enemyMarks[r][c] = 'hit';
-                            checkEnemyShipKilled();
+                            enemyMarks[r][c] = 'hit'; checkEnemyShipKilled();
                             statusMessage.textContent = '🎯 Попадание! Стреляй ещё!';
-                            if (enemyShips.every(s => !s.alive)) {
-                                gameOver = true; battleMode = false;
-                                statusMessage.textContent = '🏆 ПОБЕДА! Ты уничтожила весь флот!';
-                                stopBattle();
+                            if (enemyShips.every(s => !s.alive)) { 
+                                gameOver = true; battleMode = false; 
+                                showEnemyShips = true;
+                                statusMessage.textContent = '🏆 ПОБЕДА! Ты уничтожила весь флот!'; 
+                                stopBattle(); 
                             }
                         } else {
-                            enemyMarks[r][c] = 'miss';
-                            statusMessage.textContent = '💧 Мимо. Ход бота...';
-                            myTurn = false;
-                            renderAll();
-                            setTimeout(botTurn, 800);
-                            return;
+                            enemyMarks[r][c] = 'miss'; statusMessage.textContent = '💧 Мимо. Ход бота...';
+                            myTurn = false; renderAll(); setTimeout(botTurn, 800); return;
                         }
-                        renderAll();
                     } else {
                         if (enemyMarks[r][c] === '') enemyMarks[r][c] = 'miss';
                         else if (enemyMarks[r][c] === 'miss') enemyMarks[r][c] = 'hit';
-                        else if (enemyMarks[r][c] === 'hit') enemyMarks[r][c] = '';
+                        else enemyMarks[r][c] = '';
                     }
                 } else {
-                    if (myMarks[r][c] === '') {
-                        if (myGridData[r][c] !== 0) myMarks[r][c] = 'hit';
-                        else myMarks[r][c] = 'miss';
-                    } else { myMarks[r][c] = ''; }
+                    if (myMarks[r][c] === '') { myMarks[r][c] = myGridData[r][c] !== 0 ? 'hit' : 'miss'; }
+                    else myMarks[r][c] = '';
                 }
                 renderAll();
             }
 
             function checkEnemyShipKilled() {
                 for (let ship of enemyShips) {
-                    if (!ship.alive) continue;
-                    if (ship.cells.every(([sr, sc]) => enemyMarks[sr][sc] === 'hit')) {
-                        ship.alive = false;
-                        statusMessage.textContent = `💥 УБИТ! ${getShipName(ship.type)} уничтожен!`;
+                    if (ship.alive && ship.cells.every(([sr, sc]) => enemyMarks[sr][sc] === 'hit')) {
+                        ship.alive = false; statusMessage.textContent = `💥 УБИТ! ${getShipName(ship.type)}!`;
                     }
                 }
             }
 
-            function getShipName(type) {
-                const map = { 'airplane': 'Самолёт', 'steamship': 'Пароход', 'tank': 'Танк', 'human': 'Человечек', 'headquarters': 'Штаб' };
-                return map[type] || type;
-            }
+            function getShipName(t) { return { airplane:'Самолёт', steamship:'Пароход', tank:'Танк', human:'Человечек', headquarters:'Штаб' }[t]||t; }
 
             function getAvailableCells() {
-                const available = [];
-                for (let r = 0; r < SIZE; r++)
-                    for (let c = 0; c < SIZE; c++)
-                        if (myMarks[r][c] === '') available.push([r, c]);
-                return available;
+                const a = []; for (let r=0;r<SIZE;r++) for (let c=0;c<SIZE;c++) if (myMarks[r][c]==='') a.push([r,c]); return a;
             }
 
-            function figureMatches(wounded, figureCoords, offsetR, offsetC) {
+            function figureMatches(w, coords, oR, oC) {
                 const cells = new Set();
-                for (let [dr, dc] of figureCoords) {
-                    const r = offsetR + dr, c = offsetC + dc;
-                    if (r < 0 || r >= SIZE || c < 0 || c >= SIZE) return false;
-                    if (myMarks[r][c] === 'miss') return false;
-                    cells.add(r + ',' + c);
+                for (let [dr,dc] of coords) {
+                    const r=oR+dr,c=oC+dc;
+                    if (r<0||r>=SIZE||c<0||c>=SIZE||myMarks[r][c]==='miss') return false;
+                    cells.add(r+','+c);
                 }
-                for (let [hr, hc] of wounded.hits) {
-                    if (!cells.has(hr + ',' + hc)) return false;
-                }
-                return true;
+                return w.hits.every(([hr,hc]) => cells.has(hr+','+hc));
             }
 
-            function getPossiblePositions(wounded) {
-                const positions = [];
-                const possibleTypes = ['airplane', 'steamship', 'tank', 'human', 'headquarters'];
-                for (let type of possibleTypes) {
-                    for (let variant of ALL_FIGURE_VARIANTS[type]) {
-                        for (let [hr, hc] of wounded.hits) {
-                            for (let [dr, dc] of variant) {
-                                const offsetR = hr - dr, offsetC = hc - dc;
-                                if (figureMatches(wounded, variant, offsetR, offsetC)) {
-                                    positions.push({ type, coords: variant, offsetR, offsetC });
-                                }
+            function getPossiblePositions(w) {
+                const pos = [];
+                for (let type of ['airplane','steamship','tank','human','headquarters']) {
+                    for (let v of ALL_FIGURE_VARIANTS[type]) {
+                        for (let [hr,hc] of w.hits) {
+                            for (let [dr,dc] of v) {
+                                const oR=hr-dr,oC=hc-dc;
+                                if (figureMatches(w,v,oR,oC)) pos.push({type,coords:v,offsetR:oR,offsetC:oC});
                             }
                         }
                     }
                 }
-                const unique = [];
-                const seen = new Set();
-                for (let pos of positions) {
-                    const key = pos.type + '|' + pos.offsetR + '|' + pos.offsetC;
-                    if (!seen.has(key)) { seen.add(key); unique.push(pos); }
-                }
-                return unique;
+                const u=[],s=new Set();
+                for (let p of pos) { const k=p.type+'|'+p.offsetR+'|'+p.offsetC; if(!s.has(k)){s.add(k);u.push(p);} }
+                return u;
             }
 
             function collectSmartTargets() {
-                const targets = [], added = new Set();
-                for (let wounded of botWoundedShips) {
-                    const positions = getPossiblePositions(wounded);
-                    for (let pos of positions) {
-                        for (let [dr, dc] of pos.coords) {
-                            const r = pos.offsetR + dr, c = pos.offsetC + dc;
-                            const key = r + ',' + c;
-                            if (myMarks[r][c] === '' && !added.has(key)) {
-                                let inAll = true;
-                                for (let pos2 of positions) {
-                                    const hasCell = pos2.coords.some(([dr2, dc2]) => pos2.offsetR + dr2 === r && pos2.offsetC + dc2 === c);
-                                    if (!hasCell) { inAll = false; break; }
-                                }
-                                if (inAll) targets.unshift([r, c]);
-                                else targets.push([r, c]);
-                                added.add(key);
-                            }
+                const t=[],a=new Set();
+                for (let w of botWoundedShips) {
+                    const pos=getPossiblePositions(w);
+                    for (let p of pos) for (let [dr,dc] of p.coords) {
+                        const r=p.offsetR+dr,c=p.offsetC+dc,k=r+','+c;
+                        if (myMarks[r][c]===''&&!a.has(k)) {
+                            let all=pos.every(p2=>p2.coords.some(([d2r,d2c])=>p2.offsetR+d2r===r&&p2.offsetC+d2c===c));
+                            if(all) t.unshift([r,c]); else t.push([r,c]); a.add(k);
                         }
                     }
                 }
-                return targets;
+                return t;
             }
 
             function botTurn() {
-                if (gameOver || gameMode !== 'bot') return;
-                if (botDifficulty === 'easy') {
-                    const available = getAvailableCells();
-                    if (available.length === 0) return;
-                    const [r, c] = available[Math.floor(Math.random() * available.length)];
-                    processBotShot(r, c);
-                    return;
-                }
-                const smartTargets = collectSmartTargets();
-                let targetR, targetC;
-                if (smartTargets.length > 0) {
-                    [targetR, targetC] = smartTargets[0];
-                } else {
-                    const available = getAvailableCells();
-                    if (available.length === 0) return;
-                    [targetR, targetC] = available[Math.floor(Math.random() * available.length)];
-                }
-                processBotShot(targetR, targetC);
+                if (gameOver||gameMode!=='bot') return;
+                if (botDifficulty==='easy') { const a=getAvailableCells(); if(a.length){const[r,c]=a[Math.floor(Math.random()*a.length)];processBotShot(r,c);} return; }
+                const smart=collectSmartTargets();
+                if (smart.length) { processBotShot(smart[0][0],smart[0][1]); }
+                else { const a=getAvailableCells(); if(a.length){const[r,c]=a[Math.floor(Math.random()*a.length)];processBotShot(r,c);} }
             }
 
-            function processBotShot(targetR, targetC) {
-                if (myGridData[targetR][targetC] !== 0) {
-                    myMarks[targetR][targetC] = 'hit';
-                    const shipId = myGridData[targetR][targetC];
-                    let woundedShip = botWoundedShips.find(w => w.hits.some(([hr, hc]) => myGridData[hr][hc] === shipId));
-                    if (!woundedShip) {
-                        woundedShip = { hits: [], firstHit: [targetR, targetC], shipId };
-                        botWoundedShips.push(woundedShip);
-                    }
-                    woundedShip.hits.push([targetR, targetC]);
-
-                    let killedShip = null;
-                    for (let ship of myShips) {
-                        if (!ship.alive) continue;
-                        if (ship.cells.some(([sr, sc]) => myGridData[sr][sc] === shipId)) {
-                            if (ship.cells.every(([sr, sc]) => myMarks[sr][sc] === 'hit')) {
-                                ship.alive = false;
-                                killedShip = ship;
-                                botWoundedShips = botWoundedShips.filter(w => w.shipId !== shipId);
-                            }
-                            break;
+            function processBotShot(r, c) {
+                if (myGridData[r][c]!==0) {
+                    myMarks[r][c]='hit'; const sid=myGridData[r][c];
+                    let w=botWoundedShips.find(w=>w.hits.some(([hr,hc])=>myGridData[hr][hc]===sid));
+                    if(!w){w={hits:[],firstHit:[r,c],shipId:sid};botWoundedShips.push(w);}
+                    w.hits.push([r,c]);
+                    let killed=null;
+                    for (let s of myShips) {
+                        if (s.alive&&s.cells.some(([sr,sc])=>myGridData[sr][sc]===sid)&&s.cells.every(([sr,sc])=>myMarks[sr][sc]==='hit')) {
+                            s.alive=false; killed=s; botWoundedShips=botWoundedShips.filter(w=>w.shipId!==sid); break;
                         }
                     }
-
-                    if (killedShip) {
-                        for (let [sr, sc] of killedShip.cells) {
-                            for (let dr = -1; dr <= 1; dr++) {
-                                for (let dc = -1; dc <= 1; dc++) {
-                                    if (dr === 0 && dc === 0) continue;
-                                    const nr = sr + dr, nc = sc + dc;
-                                    if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && myMarks[nr][nc] === '') {
-                                        myMarks[nr][nc] = 'miss';
-                                    }
-                                }
-                            }
+                    if (killed) {
+                        for (let [sr,sc] of killed.cells) for (let dr=-1;dr<=1;dr++) for (let dc=-1;dc<=1;dc++) {
+                            if(dr===0&&dc===0)continue;
+                            const nr=sr+dr,nc=sc+dc;
+                            if(nr>=0&&nr<SIZE&&nc>=0&&nc<SIZE&&myMarks[nr][nc]==='')myMarks[nr][nc]='miss';
                         }
-                        if (myShips.every(s => !s.alive)) {
-                            statusMessage.textContent = '💀 ПОРАЖЕНИЕ. Бот уничтожил твой флот...';
-                            myTurn = true; gameOver = true; battleMode = false;
-                            stopBattle(); renderAll();
-                            return;
+                        if (myShips.every(s=>!s.alive)) { 
+                            showEnemyShips = true; // ПОКАЗЫВАЕМ ОСТАВШИЕСЯ КОРАБЛИ БОТА
+                            statusMessage.textContent='💀 ПОРАЖЕНИЕ. Бот уничтожил флот...'; 
+                            myTurn=true;gameOver=true;battleMode=false;stopBattle();renderAll();return; 
                         }
-                        statusMessage.textContent = `😵 Бот сбил ${getShipName(killedShip.type)}! Продолжает стрелять...`;
-                        renderAll();
-                        setTimeout(botTurn, 500);
-                        return;
+                        statusMessage.textContent=`😵 Бот сбил ${getShipName(killed.type)}! Продолжает...`;
+                        renderAll(); setTimeout(botTurn,500); return;
                     }
-
-                    statusMessage.textContent = '😡 Бот попал! Продолжает стрелять...';
-                    renderAll();
-                    setTimeout(botTurn, 500);
+                    statusMessage.textContent='😡 Бот попал! Продолжает...';
+                    renderAll(); setTimeout(botTurn,500);
                 } else {
-                    myMarks[targetR][targetC] = 'miss';
-                    renderAll();
-                    statusMessage.textContent = '😌 Бот промахнулся. Твой ход!';
-                    myTurn = true;
+                    myMarks[r][c]='miss'; renderAll();
+                    statusMessage.textContent='😌 Бот промахнулся. Твой ход!'; myTurn=true;
                 }
             }
 
             function resetMarks() {
-                myMarks = Array(SIZE).fill().map(() => Array(SIZE).fill(''));
-                enemyMarks = Array(SIZE).fill().map(() => Array(SIZE).fill(''));
-                botWoundedShips = [];
+                myMarks=Array(SIZE).fill().map(()=>Array(SIZE).fill(''));
+                enemyMarks=Array(SIZE).fill().map(()=>Array(SIZE).fill(''));
+                botWoundedShips=[]; 
+                showEnemyShips = false;
                 renderAll();
             }
 
             function startBattle() {
-                if (myShips.length === 0) { alert('Сначала нажми «Перемешать»!'); return; }
-                if (gameMode === 'bot') {
-                    if (enemyShips.length === 0) shuffleEnemyFleet();
-                    myTurn = true; gameOver = false;
-                    botWoundedShips = [];
-                    statusMessage.textContent = '⚔️ БОЙ! Твой ход — стреляй по врагу.';
-                } else {
-                    statusMessage.textContent = '⚔️ БОЙ! Отмечайте выстрелы.';
-                }
-                battleMode = true; gameOver = false;
-                btnShuffle.disabled = true; btnBattle.disabled = true;
-                saveNames();
+                if (!myShips.length) { alert('Нажми «Перемешать»!'); return; }
+                showEnemyShips = false;
+                if (gameMode==='bot') { if(!enemyShips.length)shuffleEnemyFleet(); myTurn=true;gameOver=false;botWoundedShips=[]; statusMessage.textContent='⚔️ БОЙ! Твой ход!'; }
+                else statusMessage.textContent='⚔️ БОЙ! Отмечайте выстрелы.';
+                battleMode=true;gameOver=false;btnShuffle.disabled=true;btnBattle.disabled=true;saveNames();
+                renderAll();
             }
 
-            function stopBattle() {
-                battleMode = false;
-                btnShuffle.disabled = false;
-                btnBattle.disabled = false;
-                if (gameMode === 'bot' && !gameOver) statusMessage.textContent = '';
-            }
+            function stopBattle() { battleMode=false;btnShuffle.disabled=false;btnBattle.disabled=false; }
 
-            const STORAGE_KEY = 'samoletkub_stats_V11';
-            function getAllStats() { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : {}; }
-            function saveAllStats(s) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
-            function getPairKey(a, b) { return [(a || 'Я').trim().toLowerCase(), (b || 'Соперник').trim().toLowerCase()].sort().join('_vs_'); }
-            function getPairStats(a, b) { const all = getAllStats(); const key = getPairKey(a, b); return all[key] || []; }
-            function savePairStats(a, b, s) { const all = getAllStats(); all[getPairKey(a, b)] = s; saveAllStats(all); }
-
-            function addGameResult(my, opp, winnerIsMe, cb) {
-                const s = getPairStats(my, opp);
-                s.push({ myName: my || 'Я', oppName: opp || 'Соперник', winnerIsMe, date: new Date().toLocaleString('ru-RU'), mode: gameMode, difficulty: gameMode === 'bot' ? botDifficulty : null });
-                savePairStats(my, opp, s); displayStats(); updateScoreboard();
-                if (cb) cb();
-            }
-
-            function clearCurrentStats() {
-                const my = myNameInput.value, opp = oppNameInput.value;
-                if (confirm('Сбросить статистику?')) { savePairStats(my, opp, []); displayStats(); updateScoreboard(); }
-            }
-
-            function updateScoreboard() {
-                const my = myNameInput.value || 'Я', opp = oppNameInput.value || 'Соперник';
-                const s = getPairStats(my, opp);
-                if (s.length === 0) { scoreboard.style.display = 'none'; return; }
-                let mw = 0, ow = 0;
-                s.forEach(x => { if (x.winnerIsMe) mw++; else ow++; });
-                scoreboard.textContent = `🏆 ${my} ${mw} — ${ow} ${opp}`;
-                scoreboard.style.display = 'block';
-            }
-
-            function displayStats() {
-                const my = myNameInput.value || 'Я', opp = oppNameInput.value || 'Соперник';
-                const s = getPairStats(my, opp);
-                if (s.length === 0) { statsList.innerHTML = 'Нет сыгранных партий'; statsSummary.textContent = ''; scoreboard.style.display = 'none'; }
-                else {
-                    let html = '', mw = 0, ow = 0;
-                    s.forEach((x, i) => {
-                        let extra = x.mode === 'bot' ? '🤖' : '👥';
-                        if (x.difficulty === 'easy') extra += '🟢'; else if (x.difficulty === 'medium') extra += '🟡'; else if (x.difficulty === 'hard') extra += '🔴';
-                        html += `<div class="stat-row">Партия ${i+1}: ${x.myName} ${x.winnerIsMe?'1':'0'} - ${x.oppName} ${x.winnerIsMe?'0':'1'} (${x.date}) ${extra}</div>`;
-                        if (x.winnerIsMe) mw++; else ow++;
-                    });
-                    statsList.innerHTML = html;
-                    statsSummary.textContent = `Общий счёт: ${my} ${mw} — ${ow} ${opp}`;
-                    updateScoreboard();
-                }
-            }
-
-            function saveNames() { localStorage.setItem('samoletkub_myName', myNameInput.value); localStorage.setItem('samoletkub_oppName', oppNameInput.value); }
-            function loadNames() { const m = localStorage.getItem('samoletkub_myName'); const o = localStorage.getItem('samoletkub_oppName'); if (m) myNameInput.value = m; if (o) oppNameInput.value = o; }
-            function onNamesChanged() { saveNames(); displayStats(); updateScoreboard(); }
-
-            function showWinnerSelect(cb) { winnerSelect.style.display = 'flex'; winnerSelect._callback = cb; }
-            function hideWinnerSelect() { winnerSelect.style.display = 'none'; winnerSelect._callback = null; }
+            const SK='samoletkub_stats_V12';
+            function gAS(){const r=localStorage.getItem(SK);return r?JSON.parse(r):{};}
+            function sAS(s){localStorage.setItem(SK,JSON.stringify(s));}
+            function gPK(a,b){return[(a||'Я').trim().toLowerCase(),(b||'Соперник').trim().toLowerCase()].sort().join('_vs_');}
+            function gPS(a,b){const all=gAS();return all[gPK(a,b)]||[];}
+            function sPS(a,b,s){const all=gAS();all[gPK(a,b)]=s;sAS(all);}
+            function addGameResult(my,opp,w,cb){const s=gPS(my,opp);s.push({myName:my||'Я',oppName:opp||'Соперник',winnerIsMe:w,date:new Date().toLocaleString('ru-RU'),mode:gameMode,difficulty:gameMode==='bot'?botDifficulty:null});sPS(my,opp,s);displayStats();updateScoreboard();if(cb)cb();}
+            function clearCurrentStats(){const my=myNameInput.value,opp=oppNameInput.value;if(confirm('Сбросить?')){sPS(my,opp,[]);displayStats();updateScoreboard();}}
+            function updateScoreboard(){const my=myNameInput.value||'Я',opp=oppNameInput.value||'Соперник';const s=gPS(my,opp);if(!s.length){scoreboard.style.display='none';return;}let mw=0,ow=0;s.forEach(x=>{if(x.winnerIsMe)mw++;else ow++;});scoreboard.textContent=`🏆 ${my} ${mw} — ${ow} ${opp}`;scoreboard.style.display='block';}
+            function displayStats(){const my=myNameInput.value||'Я',opp=oppNameInput.value||'Соперник';const s=gPS(my,opp);if(!s.length){statsList.innerHTML='Нет сыгранных партий';statsSummary.textContent='';scoreboard.style.display='none';}else{let h='',mw=0,ow=0;s.forEach((x,i)=>{let e=x.mode==='bot'?'🤖':'👥';if(x.difficulty==='easy')e+='🟢';else if(x.difficulty==='medium')e+='🟡';else if(x.difficulty==='hard')e+='🔴';h+=`<div class="stat-row">Партия ${i+1}: ${x.myName} ${x.winnerIsMe?'1':'0'} - ${x.oppName} ${x.winnerIsMe?'0':'1'} (${x.date}) ${e}</div>`;if(x.winnerIsMe)mw++;else ow++;});statsList.innerHTML=h;statsSummary.textContent=`Общий счёт: ${my} ${mw} — ${ow} ${opp}`;updateScoreboard();}}
+            function saveNames(){localStorage.setItem('sn_my',myNameInput.value);localStorage.setItem('sn_opp',oppNameInput.value);}
+            function loadNames(){const m=localStorage.getItem('sn_my'),o=localStorage.getItem('sn_opp');if(m)myNameInput.value=m;if(o)oppNameInput.value=o;}
+            function onNamesChanged(){saveNames();displayStats();updateScoreboard();}
+            function showWS(cb){winnerSelect.style.display='flex';winnerSelect._callback=cb;}
+            function hideWS(){winnerSelect.style.display='none';}
 
             function switchMode(mode) {
-                if (battleMode) { alert('Нельзя менять режим во время боя!'); return; }
-                gameMode = mode;
-                if (mode === 'friend') {
-                    modeFriend.classList.add('active'); modeBot.classList.remove('active');
-                    oppNameInput.disabled = false; oppNameInput.placeholder = 'Соперник';
-                    difficultySelect.style.display = 'none';
-                } else {
-                    modeBot.classList.add('active'); modeFriend.classList.remove('active');
-                    oppNameInput.disabled = true; oppNameInput.value = 'Бот';
-                    difficultySelect.style.display = 'flex';
-                }
-                enemyGridData = Array(SIZE).fill().map(() => Array(SIZE).fill(0));
-                enemyShips = []; resetMarks(); gameOver = false; myTurn = true;
-                statusMessage.textContent = ''; saveNames(); displayStats(); updateScoreboard();
-                btnBattle.disabled = true; renderAll();
+                if(battleMode){alert('Нельзя менять режим во время боя!');return;}
+                gameMode=mode; showEnemyShips = false;
+                if(mode==='friend'){modeFriend.classList.add('active');modeBot.classList.remove('active');oppNameInput.disabled=false;oppNameInput.placeholder='Соперник';difficultySelect.style.display='none';}
+                else {modeBot.classList.add('active');modeFriend.classList.remove('active');oppNameInput.disabled=true;oppNameInput.value='Бот';difficultySelect.style.display='flex';}
+                enemyGridData=Array(SIZE).fill().map(()=>Array(SIZE).fill(0));enemyShips=[];resetMarks();gameOver=false;myTurn=true;
+                statusMessage.textContent='';saveNames();displayStats();updateScoreboard();btnBattle.disabled=true;renderAll();
             }
 
-            function setDifficulty(diff) {
-                botDifficulty = diff;
-                document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
-                document.querySelector(`.diff-btn.${diff}`).classList.add('active');
-            }
+            function setDifficulty(d){botDifficulty=d;document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('active'));document.querySelector(`.diff-btn.${d}`).classList.add('active');}
 
-            myNameInput.addEventListener('input', onNamesChanged);
-            oppNameInput.addEventListener('input', onNamesChanged);
-            modeFriend.addEventListener('click', () => switchMode('friend'));
-            modeBot.addEventListener('click', () => switchMode('bot'));
-            document.querySelectorAll('.diff-btn').forEach(btn => { btn.addEventListener('click', () => setDifficulty(btn.dataset.diff)); });
+            myNameInput.addEventListener('input',onNamesChanged);oppNameInput.addEventListener('input',onNamesChanged);
+            modeFriend.addEventListener('click',()=>switchMode('friend'));modeBot.addEventListener('click',()=>switchMode('bot'));
+            document.querySelectorAll('.diff-btn').forEach(b=>b.addEventListener('click',()=>setDifficulty(b.dataset.diff)));
+            document.getElementById('btnShuffle').addEventListener('click',()=>{shuffleMyFleet();if(gameMode==='bot')shuffleEnemyFleet();saveNames();btnBattle.disabled=false;statusMessage.textContent=gameMode==='bot'?'Флот готов. Жми «В БОЙ»':'';});
+            document.getElementById('btnBattle').addEventListener('click',startBattle);
+            btnContinue.addEventListener('click',()=>{if(!myShips.length){alert('Нажми «Перемешать»!');return;}saveNames();showWS(()=>{resetMarks();stopBattle();gameOver=false;myTurn=true;statusMessage.textContent='';});});
+            btnFinish.addEventListener('click',()=>{if(!myShips.length){alert('Нажми «Перемешать»!');return;}saveNames();showWS(()=>{stopBattle();gameOver=false;myTurn=true;statusMessage.textContent='';});});
+            document.getElementById('btnWinMe').addEventListener('click',()=>{const cb=winnerSelect._callback;addGameResult(myNameInput.value,oppNameInput.value,true,cb);hideWS();});
+            document.getElementById('btnWinOpp').addEventListener('click',()=>{const cb=winnerSelect._callback;addGameResult(myNameInput.value,oppNameInput.value,false,cb);hideWS();});
+            document.getElementById('btnCancelFinish').addEventListener('click',hideWS);
+            document.getElementById('btnClearStats').addEventListener('click',clearCurrentStats);
 
-            document.getElementById('btnShuffle').addEventListener('click', () => { shuffleMyFleet(); if (gameMode === 'bot') shuffleEnemyFleet(); saveNames(); btnBattle.disabled = false; statusMessage.textContent = gameMode === 'bot' ? 'Флот готов. Жми «В БОЙ»' : ''; });
-            document.getElementById('btnBattle').addEventListener('click', startBattle);
-            btnContinue.addEventListener('click', () => { if (myShips.length === 0) { alert('Сначала нажми «Перемешать»!'); return; } saveNames(); showWinnerSelect(() => { resetMarks(); stopBattle(); gameOver = false; myTurn = true; statusMessage.textContent = ''; }); });
-            btnFinish.addEventListener('click', () => { if (myShips.length === 0) { alert('Сначала нажми «Перемешать»!'); return; } saveNames(); showWinnerSelect(() => { stopBattle(); gameOver = false; myTurn = true; statusMessage.textContent = ''; }); });
-            document.getElementById('btnWinMe').addEventListener('click', () => { const cb = winnerSelect._callback; addGameResult(myNameInput.value, oppNameInput.value, true, cb); hideWinnerSelect(); });
-            document.getElementById('btnWinOpp').addEventListener('click', () => { const cb = winnerSelect._callback; addGameResult(myNameInput.value, oppNameInput.value, false, cb); hideWinnerSelect(); });
-            document.getElementById('btnCancelFinish').addEventListener('click', hideWinnerSelect);
-            document.getElementById('btnClearStats').addEventListener('click', clearCurrentStats);
-
-            loadNames(); displayStats(); updateScoreboard();
-            btnBattle.disabled = true; oppNameInput.disabled = false; difficultySelect.style.display = 'none';
+            loadNames();displayStats();updateScoreboard();btnBattle.disabled=true;oppNameInput.disabled=false;difficultySelect.style.display='none';
         })();
     </script>
 </body>
