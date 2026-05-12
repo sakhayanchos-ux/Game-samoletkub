@@ -21,8 +21,6 @@
             flex-direction: column;
             color: #ecf0f1;
             padding: 10px;
-            padding-top: env(safe-area-inset-top);
-            padding-bottom: env(safe-area-inset-bottom);
         }
         h1 { margin: 6px 0; font-size: 24px; letter-spacing: 4px; text-shadow: 2px 2px 4px #000; color: #f1c40f; }
         .mode-select { display: flex; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; justify-content: center; }
@@ -53,7 +51,7 @@
             background: #2c3e50; color: #ecf0f1; text-align: center;
             font-family: 'Courier New', monospace; font-weight: bold; width: 130px; letter-spacing: 1px;
         }
-        .names-container input::placeholder { color: #7f8c8d; letter-spacing: 0; }
+        .names-container input::placeholder { color: #7f8c8d; }
         .names-container input:disabled { opacity: 0.5; }
         .game-container { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
         .player-section {
@@ -100,8 +98,8 @@
             transition: 0.2s; box-shadow: 0 4px 8px rgba(0,0,0,0.3);
             font-family: 'Courier New', monospace; -webkit-tap-highlight-color: transparent;
         }
-        button:active:not(:disabled) { transform: scale(0.94); box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
-        button:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+        button:active:not(:disabled) { transform: scale(0.94); }
+        button:disabled { opacity: 0.4; cursor: not-allowed; }
         .btn-shuffle { background: #e67e22; color: white; }
         .btn-battle { background: #e74c3c; color: white; }
         .btn-continue { background: #27ae60; color: white; }
@@ -121,7 +119,7 @@
             margin-top: 16px; background: #1a252f; padding: 14px; border-radius: 12px;
             border: 2px solid #4a6274; width: 100%; max-width: 520px; max-height: 220px; overflow-y: auto;
         }
-        .stats-container h3 { text-align: center; color: #f1c40f; margin-bottom: 10px; font-size: 17px; letter-spacing: 1px; }
+        .stats-container h3 { text-align: center; color: #f1c40f; margin-bottom: 10px; font-size: 17px; }
         .stats-container .stat-row { font-size: 13px; padding: 4px 0; border-bottom: 1px solid #2c3e50; color: #bdc3c7; }
         .stats-summary { font-weight: bold; color: #2ecc71; margin-top: 8px; text-align: center; font-size: 14px; }
         .footer { margin-top: 20px; text-align: center; color: #7f8c8d; font-size: 12px; letter-spacing: 1px; padding: 10px; }
@@ -198,7 +196,7 @@
 
     <script>
         if ('serviceWorker' in navigator) {
-            const swCode = `self.addEventListener('install',(e)=>{e.waitUntil(caches.open('samoletkub-v11').then(c=>c.addAll(['./'])));self.skipWaiting();});self.addEventListener('fetch',(e)=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));});`;
+            const swCode = `self.addEventListener('install',(e)=>{e.waitUntil(caches.open('samoletkub-v12').then(c=>c.addAll(['./'])));self.skipWaiting();});self.addEventListener('fetch',(e)=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));});`;
             navigator.serviceWorker.register(URL.createObjectURL(new Blob([swCode],{type:'application/javascript'}))).catch(()=>{});
         }
 
@@ -277,16 +275,16 @@
             createLabels('colLabelsMyTop', 'colLabelsMyBottom', 'rowLabelsMyLeft', 'rowLabelsMyRight');
             createLabels('colLabelsEnTop', 'colLabelsEnBottom', 'rowLabelsEnLeft', 'rowLabelsEnRight');
 
-            function createGrid(container, isEnemy) {
+            function createGrid(container) {
                 container.innerHTML = '';
                 for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) {
                     const cell = document.createElement('div'); cell.className = 'cell';
                     cell.dataset.row = r; cell.dataset.col = c;
-                    cell.addEventListener('click', () => cellClick(r, c, isEnemy));
+                    cell.addEventListener('click', () => cellClick(r, c, container === enemyGridEl));
                     container.appendChild(cell);
                 }
             }
-            createGrid(myGridEl, false); createGrid(enemyGridEl, true);
+            createGrid(myGridEl); createGrid(enemyGridEl);
 
             function canPlace(grid, coords, oR, oC) {
                 for (let [dr, dc] of coords) {
@@ -406,7 +404,7 @@
             function checkEnemyShipKilled() {
                 for (let ship of enemyShips) {
                     if (ship.alive && ship.cells.every(([sr, sc]) => enemyMarks[sr][sc] === 'hit')) {
-                        ship.alive = false; statusMessage.textContent = `💥 УБИТ! ${getShipName(ship.type)}!`;
+                        ship.alive = false;
                     }
                 }
             }
@@ -520,7 +518,7 @@
 
             function stopBattle() { battleMode=false;btnShuffle.disabled=false;btnBattle.disabled=false; }
 
-            const SK='samoletkub_stats_V13';
+            const SK='samoletkub_stats_V14';
             function gAS(){const r=localStorage.getItem(SK);return r?JSON.parse(r):{};}
             function sAS(s){localStorage.setItem(SK,JSON.stringify(s));}
             function gPK(a,b){return[(a||'Я').trim().toLowerCase(),(b||'Соперник').trim().toLowerCase()].sort().join('_vs_');}
